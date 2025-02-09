@@ -5,6 +5,10 @@ coverage
 flake8
 pytest >3.9
 sphinx
+dask
+colorspacious
+tqdm
+scikit-image
 # These are dependencies of various sphinx extensions for documentation.
 ipython
 matplotlib

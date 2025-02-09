@@ -5,3 +5,4 @@ requests
 scikit-image
 scipy
 tqdm
+dask
