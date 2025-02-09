@@ -28,7 +28,7 @@ def test_exhaust_simple_matcher_unique(pool):
 def test_depth(pool):
     "using greater depth should trace out the mask edge more closely"
     image = np.zeros((1000, 1000))
-    rr, cc = draw.circle(300, 500, 150)
+    rr, cc = draw.circle_perimeter(300, 500, 150)
     image[rr, cc] = 1
     image = pm.rescale_commensurate(image, (5, 5), depth=2)
     mask = image.astype(bool)
