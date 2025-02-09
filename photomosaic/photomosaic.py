@@ -869,8 +869,8 @@ def crop_to_fit(image, shape):
     for actual, target in zip(resized.shape, shape):
         overflow = actual - target
         # Center the image and crop, biasing left if overflow is odd.
-        left_margin = np.floor(overflow / 2)
-        right_margin = np.ceil(overflow / 2)
+        left_margin = int(np.floor(overflow / 2))
+        right_margin = int(np.ceil(overflow / 2))
         crop_width.append((left_margin, right_margin))
     # Do not crop any additional dimensions beyond those given in shape.
     for _ in range(resized.ndim - len(shape)):
