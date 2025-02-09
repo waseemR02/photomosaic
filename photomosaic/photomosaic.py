@@ -18,11 +18,15 @@ from scipy.cluster import vq
 import matplotlib.pyplot as plt
 
 
-options = {'imread': {},
-           'perceptual': {"name": "J'a'b'",
-                          "ciecam02_space": colorspacious.CIECAM02Space.sRGB,
-                          "luoetal2006_space": colorspacious.CAM02UCS},
-           'rgb': 'sRGB1'}
+options = {
+    "imread": {},
+    "perceptual": {
+        "name": "J'a'b'",
+        "ciecam02_space": colorspacious.CIECAM02Space.sRGB,
+        "luoetal2006_space": colorspacious.CAM02UCS,
+    },
+    "rgb": "sRGB1",
+}
 
 
 def set_options(imread=None, perceptual=None, rgb=None, flickr_api_key=None):
@@ -44,13 +48,13 @@ def set_options(imread=None, perceptual=None, rgb=None, flickr_api_key=None):
     """
     global options
     if imread is not None:
-        options['imread'].update(imread)
+        options["imread"].update(imread)
     if perceptual is not None:
-        options['perceptual'] = perceptual
+        options["perceptual"] = perceptual
     if rgb is not None:
-        options['rgb'] = rgb
+        options["rgb"] = rgb
     if flickr_api_key is not None:
-        options['flickr_api_key'] = flickr_api_key
+        options["flickr_api_key"] = flickr_api_key
 
 
 def basic_mosaic(image, pool, grid_dims, *, mask=None, depth=0):
@@ -111,12 +115,14 @@ def basic_mosaic(image, pool, grid_dims, *, mask=None, depth=0):
 
     # Partition the image into tiles and characterize each one's color.
     tiles = partition(adapted_img, grid_dims=grid_dims, mask=mask, depth=depth)
-    tile_colors = [np.mean(adapted_img[tile].reshape(-1, 3), 0)
-                   for tile in tqdm(tiles, desc='analyzing tiles')]
+    tile_colors = [
+        np.mean(adapted_img[tile].reshape(-1, 3), 0)
+        for tile in tqdm(tiles, desc="analyzing tiles", bar_format='{l_bar}{bar:30}{r_bar}')
+    ]
 
     # Match a pool image to each tile.
     match = simple_matcher(pool)
-    matches = [match(tc) for tc in tqdm(tile_colors, desc='matching')]
+    matches = [match(tc) for tc in tqdm(tile_colors, desc="matching", bar_format='{l_bar}{bar:30}{r_bar}')]
 
     # Draw the mosaic.
     canvas = np.ones_like(image)  # white canvas same shape as input image
@@ -135,8 +141,7 @@ def perceptual(image):
     ----------
     image : array
     """
-    return colorspacious.cspace_convert(image, options['rgb'],
-                                        options['perceptual'])
+    return colorspacious.cspace_convert(image, options["rgb"], options["perceptual"])
 
 
 def rgb(image, clip=True):
@@ -153,8 +158,7 @@ def rgb(image, clip=True):
     clip : bool, option
         Clip values out of the gamut [0, 1]. True by default.
     """
-    result = colorspacious.cspace_convert(image, options['perceptual'],
-                                          options['rgb'])
+    result = colorspacious.cspace_convert(image, options["perceptual"], options["rgb"])
     if clip:
         result = np.clip(result, 0, 1)
     return result
@@ -213,8 +217,7 @@ def rescale_commensurate(image, grid_dims, depth=0):
     rescaled_image : array
     """
     factor = np.array(grid_dims) * 2**depth
-    new_shape = [int(factor[i] * np.ceil(image.shape[i] / factor[i]))
-                 for i in [0, 1]]
+    new_shape = [int(factor[i] * np.ceil(image.shape[i] / factor[i])) for i in [0, 1]]
     return crop_to_fit(image, new_shape)
 
 
@@ -259,8 +262,9 @@ def dominant_color(pixels, n_clusters=5):
     return colors[counts.argmax()]
 
 
-def make_pool(glob_string, *, pool=None, skip_read_failures=True,
-              analyzer=None, sample_size=1000):
+def make_pool(
+    glob_string, *, pool=None, skip_read_failures=True, analyzer=None, sample_size=1000
+):
     """
     Analyze a collection of images.
 
@@ -301,14 +305,17 @@ def make_pool(glob_string, *, pool=None, skip_read_failures=True,
     filenames = glob.glob(os.path.expanduser(glob_string))
     if not filenames:
         raise ValueError("No matches found for {}".format(glob_string))
-    for filename in tqdm(filenames, desc='analyzing pool'):
+    for filename in tqdm(
+        filenames, desc="analyzing pool", bar_format="{l_bar}{bar:30}{r_bar}"
+    ):
         try:
-            raw_image = imread(filename, **options['imread'])
+            raw_image = imread(filename, **options["imread"])
             image = standardize_image(raw_image)
         except Exception as err:
             if skip_read_failures:
-                warnings.warn("Skipping {}; raised exception:\n    {}"
-                              "".format(filename, err))
+                warnings.warn(
+                    "Skipping {}; raised exception:\n    {}" "".format(filename, err)
+                )
                 continue
             raise
         # Subsample before doing expensive color space conversion.
@@ -383,8 +390,11 @@ def simple_matcher_unique(pool, limit=1):
             arguments that specify how to open the image
         """
         if len(pool) < 2:
-            raise RuntimeError("All but one of the {total} pool images have "
-                               "been used.".format(total=total))
+            raise RuntimeError(
+                "All but one of the {total} pool images have " "been used.".format(
+                    total=total
+                )
+            )
         args = list(pool.keys())
         data = np.array([vector for vector in pool.values()])
         tree = cKDTree(data)
@@ -482,17 +492,16 @@ def draw_mosaic(image, tiles, matches, scale=1, resized_copy_cache=None):
     scale = int(scale)
     if resized_copy_cache is None:
         resized_copy_cache = {}
-    for tile, match_args in zip(tqdm(tiles, desc='drawing mosaic'), matches):
+    for tile, match_args in zip(tqdm(tiles, desc="drawing mosaic", bar_format='{l_bar}{bar:30}{r_bar}'), matches):
         if scale != 1:
-            tile = tuple(slice(scale * s.start, scale * s.stop)
-                         for s in tile)
+            tile = tuple(slice(scale * s.start, scale * s.stop) for s in tile)
         target_shape = _tile_shape(tile)
         cache_key = (match_args, target_shape)
         try:
             sized_match_image = resized_copy_cache[cache_key]
         except KeyError:
             target_shape = _tile_shape(tile)
-            raw_match_image = imread(*match_args, **options['imread'])
+            raw_match_image = imread(*match_args, **options["imread"])
             match_image = standardize_image(raw_match_image)
             sized_match_image = crop_to_fit(match_image, target_shape)
             resized_copy_cache[cache_key] = sized_match_image
@@ -506,10 +515,16 @@ def _subdivide(tile):
     subtiles = []
     for y in (0, 1):
         for x in (0, 1):
-            subtile = (slice(tile[0].start + y * tile_dims[0],
-                             tile[0].start + (1 + y) * tile_dims[0]),
-                       slice(tile[1].start + x * tile_dims[1],
-                             tile[1].start + (1 + x) * tile_dims[1]))
+            subtile = (
+                slice(
+                    tile[0].start + y * tile_dims[0],
+                    tile[0].start + (1 + y) * tile_dims[0],
+                ),
+                slice(
+                    tile[1].start + x * tile_dims[1],
+                    tile[1].start + (1 + x) * tile_dims[1],
+                ),
+            )
             subtiles.append(subtile)
     return subtiles
 
@@ -544,28 +559,31 @@ def partition(image, grid_dims, mask=None, depth=0, split_thresh=10):
     # Validate inputs.
     image = np.atleast_3d(np.asarray(image))
     if isinstance(grid_dims, int):
-        tile_dims, = 2 * (grid_dims,)
+        (tile_dims,) = 2 * (grid_dims,)
     for i in (0, 1):
         image_dim = image.shape[i]
         grid_dim = grid_dims[i]
-        if image_dim % grid_dim*2**depth != 0:
-            raise ValueError("Image dimensions must be evenly divisible by "
-                             "dimensions of the (subdivided) grid. "
-                             "Dimension {image_dim} is not "
-                             "evenly divisible by {grid_dim}*2**{depth} "
-                             "".format(image_dim=image_dim, grid_dim=grid_dim,
-                                       depth=depth))
+        if image_dim % grid_dim * 2**depth != 0:
+            raise ValueError(
+                "Image dimensions must be evenly divisible by "
+                "dimensions of the (subdivided) grid. "
+                "Dimension {image_dim} is not "
+                "evenly divisible by {grid_dim}*2**{depth} "
+                "".format(image_dim=image_dim, grid_dim=grid_dim, depth=depth)
+            )
 
     # Partition into equal-sized tiles. Each tile is a pair of slice objects.
     tile_height = image.shape[0] // grid_dims[0]
     tile_width = image.shape[1] // grid_dims[1]
     tiles = []
     total = np.product(grid_dims)
-    with tqdm(total=total, desc='partitioning: depth 0') as pbar:
+    with tqdm(total=total, desc="partitioning: depth 0", bar_format='{l_bar}{bar:30}{r_bar}') as pbar:
         for y in range(grid_dims[0]):
             for x in range(grid_dims[1]):
-                tile = (slice(y * tile_height, (1 + y) * tile_height),
-                        slice(x * tile_width, (1 + x) * tile_width))
+                tile = (
+                    slice(y * tile_height, (1 + y) * tile_height),
+                    slice(x * tile_width, (1 + x) * tile_width),
+                )
                 tiles.append(tile)
                 pbar.update()
 
@@ -578,9 +596,8 @@ def partition(image, grid_dims, mask=None, depth=0, split_thresh=10):
     num_channels = image.shape[-1]
     for d in range(1, 1 + depth):
         new_tiles = []
-        for tile in tqdm(tiles, desc='partitioning: depth %d' % d):
-            if ((mask is not None) and
-                    np.any(mask[tile]) and np.any(~mask[tile])):
+        for tile in tqdm(tiles, desc="partitioning: depth %d" % d, bar_format='{l_bar}{bar:30}{r_bar}'):
+            if (mask is not None) and np.any(mask[tile]) and np.any(~mask[tile]):
                 # This tile straddles a mask edge.
                 subtiles = _subdivide(tile)
                 # Discard subtiles that reside fully outside the mask.
@@ -645,8 +662,7 @@ def translate(tile, offset):
     """
     dy, dx = offset
     y, x = tile
-    new_tile = (slice(y.start + dy, y.stop + dy),
-                slice(x.start + dx, x.stop + dx))
+    new_tile = (slice(y.start + dy, y.stop + dy), slice(x.start + dx, x.stop + dx))
     return new_tile
 
 
@@ -668,8 +684,7 @@ def pad(tile, padding):
     """
     dy, dx = padding
     y, x = tile
-    new_tile = (slice(y.start + dy, y.stop - dy),
-                slice(x.start + dx, x.stop - dx))
+    new_tile = (slice(y.start + dy, y.stop - dy), slice(x.start + dx, x.stop - dx))
     return new_tile
 
 
@@ -739,8 +754,11 @@ def palette_map(old_palette, new_palette):
         image = np.asarray(image)
         num_channels = image.shape[-1]
         if num_channels != len(functions):
-            raise ValueError("expected image with {} color channels; this has "
-                             "{}".format(len(functions), num_channels))
+            raise ValueError(
+                "expected image with {} color channels; this has " "{}".format(
+                    len(functions), num_channels
+                )
+            )
         pixels = image.reshape(-1, num_channels)
 
         result = np.empty_like(pixels)
@@ -774,11 +792,15 @@ def hist_map(old_hist, new_hist):
 
     # validate input
     if 1 + len(old_counts) != len(old_bins):
-        raise ValueError("The input old_hist is invalid. "
-                         "Length of bins should be 1 + length of counts")
+        raise ValueError(
+            "The input old_hist is invalid. "
+            "Length of bins should be 1 + length of counts"
+        )
     if 1 + len(new_counts) != len(new_bins):
-        raise ValueError("The input new_hist is invalid. "
-                         "Length of bins should be 1 + length of counts")
+        raise ValueError(
+            "The input new_hist is invalid. "
+            "Length of bins should be 1 + length of counts"
+        )
 
     # cumulative distribution functions
     old_cdf = np.insert(np.cumsum(old_counts), 0, 0) / np.sum(old_counts)
@@ -827,11 +849,13 @@ def draw_tile_layout(image, tiles, color=1):
     annotated_image : array
     """
     annotated_image = copy.deepcopy(image)
-    for y, x in tqdm(tiles):
-        edges = ((y.start, x.start, y.stop - 1, x.start),
-                 (y.stop - 1, x.start, y.stop - 1, x.stop - 1),
-                 (y.stop - 1, x.stop - 1, y.start, x.stop - 1),
-                 (y.start, x.stop - 1, y.start, x.start))
+    for y, x in tqdm(tiles, bar_format="{l_bar}{bar:30}{r_bar}"):
+        edges = (
+            (y.start, x.start, y.stop - 1, x.start),
+            (y.stop - 1, x.start, y.stop - 1, x.stop - 1),
+            (y.stop - 1, x.stop - 1, y.start, x.stop - 1),
+            (y.start, x.stop - 1, y.start, x.start),
+        )
         for edge in edges:
             rr, cc = draw.line(*edge)
             annotated_image[rr, cc] = color  # tile edges
@@ -858,11 +882,11 @@ def crop_to_fit(image, shape):
     """
     # Resize smallest dimension (width or height) to fit.
     d = np.argmin(np.array(image.shape)[:2] / np.array(shape))
-    enlarged_shape = (tuple(np.ceil(np.array(image.shape[:len(shape)]) *
-                                    shape[d]/image.shape[d])) +
-                      image.shape[len(shape):])
-    resized = resize(image, enlarged_shape,
-                     mode='constant', anti_aliasing=False)
+    enlarged_shape = (
+        tuple(np.ceil(np.array(image.shape[: len(shape)]) * shape[d] / image.shape[d]))
+        + image.shape[len(shape) :]
+    )
+    resized = resize(image, enlarged_shape, mode="constant", anti_aliasing=False)
     # Now the image is as large or larger than the shape along all dimensions.
     # Crop any overhang in the other dimension.
     crop_width = []
@@ -893,13 +917,13 @@ def rainbow_of_squares(target_dir, shape=(10, 10), range_params=(0, 256, 15)):
         Default is ``(0, 256, 15)``.
     """
     os.makedirs(target_dir, exist_ok=True)
-    with tqdm(total=3 * len(range(*range_params))) as pbar:
+    with tqdm(total=3 * len(range(*range_params)), bar_format='{l_bar}{bar:30}{r_bar}') as pbar:
         canvas = np.ones(shape + (3,))
         for r in range(*range_params):
             for g in range(*range_params):
                 for b in range(*range_params):
                     img = (canvas * [r, g, b]).astype(np.uint8)
-                    filename = '{:03d}-{:03d}-{:03d}.png'.format(r, g, b)
+                    filename = "{:03d}-{:03d}-{:03d}.png".format(r, g, b)
                     # imsave warns when saving low-contrast images.
                     with warnings.catch_warnings():
                         warnings.filterwarnings("ignore", ".*low contrast.*")
@@ -926,7 +950,7 @@ def export_pool(pool, filepath, abspath=True):
     abspath : boolean, optional
         Convert pool keys (assumed to be filenames) to absolute paths if True.
     """
-    with open(os.path.expanduser(filepath), 'w') as f:
+    with open(os.path.expanduser(filepath), "w") as f:
         json.dump({os.path.abspath(k[0]): list(v) for k, v in pool.items()}, f)
 
 
@@ -949,7 +973,7 @@ def import_pool(filepath):
     -------
     pool : dict
     """
-    with open(os.path.expanduser(filepath), 'r') as f:
+    with open(os.path.expanduser(filepath), "r") as f:
         return {tuple([k]): np.array(v) for k, v in json.load(f).items()}
 
 
